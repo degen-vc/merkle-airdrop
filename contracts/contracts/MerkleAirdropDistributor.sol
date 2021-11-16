@@ -9,9 +9,11 @@ contract MerkleAirdropDistributor is Ownable {
     using SafeERC20 for IERC20;
 
     bool isPaused;
+    uint256 listingFee;
 
     struct AirdropMetadata {
         address token;
+        uint256 totalAmount;
         bytes32 root;
         string dataIPFSHash;
     }
@@ -73,13 +75,23 @@ contract MerkleAirdropDistributor is Ownable {
     }
 
     // --- Admin ---
-    function addAirdrop(AirdropMetadata memory _metadata) external onlyOwner {
+    function addAirdrop(AirdropMetadata memory _metadata) external payable {
         airdropMetadata.push(_metadata);
-
+        IERC20(_metadata.token).safeTransferFrom(msg.sender, address(this), _metadata.totalAmount);
+        require(msg.value >= listingFee, "Not enought listing fee");
         emit NewAirdrop(_metadata.token, airdropMetadata.length - 1);
     }
 
     function togglePause() external onlyOwner {
         isPaused = !isPaused;
+    }
+
+    function setListingFee(uint256 _listingFee) external onlyOwner {
+        listingFee = _listingFee;
+    }
+
+    function withdrawFees() external onlyOwner {
+        (bool sent, ) = owner().call{value: address(this).balance}("");
+        require(sent, "Failed to send Fees");
     }
 }
